@@ -25,7 +25,7 @@ export async function recordGenesis(wallet: Wallet, handle: string): Promise<str
 
   const signedXdr = await wallet.sign(tx.toXDR());
   const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
-  const hash = await submitSigned(signed, 'genesis tx');
+  const hash = await submitSigned(signed);
 
   // Wait for it to land so the follow-up claim tx builds on an advanced sequence
   // number (otherwise the two back-to-back txs collide with txBAD_SEQ).

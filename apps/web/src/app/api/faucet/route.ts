@@ -94,7 +94,7 @@ export async function POST(req: Request): Promise<Response> {
         .build();
       const prepared = await srpc.prepareTransaction(built);
       prepared.sign(issuer); // source = issuer = SAC admin → satisfies mint's admin auth
-      const hash = await submitSigned(prepared, 'faucet mint', srpc);
+      const hash = await submitSigned(prepared, srpc);
       for (let i = 0; i < 30; i++) {
         const r = await srpc.getTransaction(hash);
         if (r.status === 'SUCCESS') break;

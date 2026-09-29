@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { TxRejectedError } from './tx-errors';
+import { TxNotQueuedError, TxRejectedError } from './tx-errors';
 
 /** Merge conditional class names + dedupe Tailwind conflicts. */
 export function cn(...inputs: ClassValue[]): string {
@@ -20,7 +20,8 @@ export function contractErrorCode(e: unknown): number | null {
  * to the first line of the message (never the scary diagnostic-event dump).
  */
 export function humanizeError(e: unknown, codeMap: Record<number, string> = {}): string {
-  if (e instanceof TxRejectedError) return e.message;
+  // Already one plain sentence (lib/tx-errors) — the keyword rules below would misread it.
+  if (e instanceof TxRejectedError || e instanceof TxNotQueuedError) return e.message;
   const raw = e instanceof Error ? e.message : String(e ?? 'Something went wrong');
   // Host-level signals first — they're clearer than a contract code AND dodge code
   // collisions (e.g. a token SAC's own #10 "insufficient balance" vs a contract's #10).
