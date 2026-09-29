@@ -4,8 +4,7 @@ import { xdr, type Transaction } from '@stellar/stellar-sdk';
 const { server } = vi.hoisted(() => ({ server: { sendTransaction: vi.fn() } }));
 vi.mock('./stellar', () => ({ server }));
 
-import { SEND_ATTEMPTS, submitSigned } from './submit';
-import { TxNotQueuedError, TxRejectedError } from './tx-errors';
+import { SEND_ATTEMPTS, TxNotQueuedError, TxRejectedError, submitSigned } from './submit';
 
 const tx = { envelope: 'signed' } as unknown as Transaction;
 
@@ -18,13 +17,13 @@ describe('submitSigned', () => {
 
   it('PENDING: resolves the hash after one send', async () => {
     server.sendTransaction.mockResolvedValue({ status: 'PENDING', hash: 'H1' });
-    await expect(submitSigned(tx)).resolves.toBe('H1');
+    await expect(submitSigned(tx, 'payment')).resolves.toBe('H1');
     expect(server.sendTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('DUPLICATE: the envelope is already queued, so it counts as accepted', async () => {
     server.sendTransaction.mockResolvedValue({ status: 'DUPLICATE', hash: 'H2' });
-    await expect(submitSigned(tx)).resolves.toBe('H2');
+    await expect(submitSigned(tx, 'payment')).resolves.toBe('H2');
     expect(server.sendTransaction).toHaveBeenCalledTimes(1);
   });
 
@@ -34,7 +33,7 @@ describe('submitSigned', () => {
       .mockResolvedValueOnce({ status: 'TRY_AGAIN_LATER', hash: 'H3' })
       .mockResolvedValueOnce({ status: 'PENDING', hash: 'H3' });
 
-    const p = submitSigned(tx);
+    const p = submitSigned(tx, 'payment');
     await vi.advanceTimersByTimeAsync(0);
     expect(server.sendTransaction).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1000); // first backoff
@@ -50,7 +49,7 @@ describe('submitSigned', () => {
   it('TRY_AGAIN_LATER on every send: gives up with a clear, retryable error', async () => {
     server.sendTransaction.mockResolvedValue({ status: 'TRY_AGAIN_LATER', hash: 'H4' });
 
-    const p = submitSigned(tx);
+    const p = submitSigned(tx, 'payment');
     const settled = expect(p).rejects.toThrow(/network is busy.*try again/);
     await vi.runAllTimersAsync();
     await settled;
@@ -68,18 +67,19 @@ describe('submitSigned', () => {
     });
     server.sendTransaction.mockResolvedValue({ status: 'ERROR', hash: 'H5', errorResult });
 
-    const err = await submitSigned(tx).catch((e: unknown) => e);
+    const err = await submitSigned(tx, 'payment').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TxRejectedError);
     expect(err).toMatchObject({
       code: 'txBadSeq',
+      what: 'payment',
       message: 'Another transaction went out at the same moment — try again.',
     });
     expect(server.sendTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('ERROR without a readable result: still a plain sentence, never an XDR dump', async () => {
-    server.sendTransaction.mockResolvedValue({ status: 'ERROR', hash: 'H7' });
-    const err = await submitSigned(tx).catch((e: unknown) => e);
+    server.sendTransaction.mockResolvedValue({ status: 'ERROR', hash: 'H7', errorResult: { code: 'x' } });
+    const err = await submitSigned(tx, 'payment').catch((e: unknown) => e);
     expect(err).toMatchObject({
       code: 'unknown',
       message: 'The network rejected this transaction. Try again in a moment.',
@@ -89,7 +89,7 @@ describe('submitSigned', () => {
   it('sends through the RPC server it is given', async () => {
     const own = { sendTransaction: vi.fn(async () => ({ status: 'PENDING', hash: 'H6' })) };
     await expect(
-      submitSigned(tx, own as unknown as Parameters<typeof submitSigned>[1]),
+      submitSigned(tx, 'faucet mint', own as unknown as Parameters<typeof submitSigned>[2]),
     ).resolves.toBe('H6');
     expect(own.sendTransaction).toHaveBeenCalledWith(tx);
     expect(server.sendTransaction).not.toHaveBeenCalled();

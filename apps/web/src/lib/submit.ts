@@ -17,16 +17,22 @@ import type { FeeBumpTransaction, Transaction, rpc } from '@stellar/stellar-sdk'
 import { server } from './stellar';
 import { TxNotQueuedError, TxRejectedError, txRejectionCode } from './tx-errors';
 
+// The error classes live in the dependency-free lib/tx-errors (humanizeError reads them).
+export { TxNotQueuedError, TxRejectedError } from './tx-errors';
+
 /** Sends of one envelope before giving up on `TRY_AGAIN_LATER` (backoff 1s, 2s, 4s between). */
 export const SEND_ATTEMPTS = 4;
 const BACKOFF_MS = 1000;
 
 /**
  * Send a signed envelope until Core queues it, and resolve its hash for the caller to poll.
- * `rpcServer` defaults to the app's RPC server (the faucet route passes its own).
+ * `what` names the transaction on a rejection (`TxRejectedError.what`, for logs; the message
+ * stays one plain sentence). `rpcServer` defaults to the app's RPC server (the faucet route
+ * passes its own).
  */
 export async function submitSigned(
   tx: Transaction | FeeBumpTransaction,
+  what: string,
   rpcServer: Pick<rpc.Server, 'sendTransaction'> = server,
 ): Promise<string> {
   for (let attempt = 1; ; attempt++) {
@@ -34,7 +40,7 @@ export async function submitSigned(
     if (sent.status === 'PENDING' || sent.status === 'DUPLICATE') return sent.hash;
     if (sent.status !== 'TRY_AGAIN_LATER') {
       // ERROR (or a status this SDK doesn't know): never poll it.
-      throw new TxRejectedError(txRejectionCode(sent.errorResult));
+      throw new TxRejectedError(txRejectionCode(sent.errorResult), what);
     }
     if (attempt >= SEND_ATTEMPTS) throw new TxNotQueuedError(sent.hash, attempt);
     await new Promise((r) => setTimeout(r, BACKOFF_MS * 2 ** (attempt - 1)));

@@ -209,7 +209,7 @@ async function submitAndWait(
   const signedXdr = await wallet.sign(prepared.toXDR());
   const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
 
-  const hash = await submitSigned(signed);
+  const hash = await submitSigned(signed, `send ${method}`);
 
   const result = await pollTransaction(hash);
   const retval = result.returnValue;

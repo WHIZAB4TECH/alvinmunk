@@ -125,7 +125,7 @@ export async function enableUsdc(wallet: Wallet): Promise<string> {
     .setTimeout(60)
     .build();
   const signed = TransactionBuilder.fromXDR(await wallet.sign(tx.toXDR()), networkPassphrase);
-  const hash = await submitSigned(signed);
+  const hash = await submitSigned(signed, 'trustline');
   await waitConfirmed(hash);
   return hash;
 }

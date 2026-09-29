@@ -14,7 +14,8 @@ const MESSAGES: Record<string, string> = {
   txBadSeq: 'Another transaction went out at the same moment — try again.',
   txTooLate: 'This took too long — try again.',
   txBadAuth: 'Your wallet is on a different network — switch networks and try again.',
-  txInsufficientBalance: 'Your XLM balance is too low to cover this transaction.',
+  // Same copy humanizeError gives a raw txInsufficientBalance (#396).
+  txInsufficientBalance: 'You need a little more XLM to cover the network fee.',
   txNoAccount: 'This account isn’t funded yet — add some XLM first.',
   txInsufficientFee: 'The network is busy and the fee was too low — try again in a moment.',
   paymentUnderfunded: 'Your balance is too low for this payment.',
@@ -62,9 +63,12 @@ function operationCode(op: xdr.OperationResult): string {
   return (op.tr().value() as { switch(): { name: string } }).switch().name;
 }
 
-/** RPC rejected the transaction (`sendTransaction` status `ERROR`). */
+/** RPC rejected the transaction (`sendTransaction` status `ERROR`). `what` names it, for logs. */
 export class TxRejectedError extends Error {
-  constructor(readonly code: string) {
+  constructor(
+    readonly code: string,
+    readonly what?: string,
+  ) {
     super(txRejectionMessage(code));
     this.name = 'TxRejectedError';
   }

@@ -67,7 +67,7 @@ describe('TxRejectedError', () => {
     ['txBadSeq', 'Another transaction went out at the same moment — try again.'],
     ['txTooLate', 'This took too long — try again.'],
     ['txBadAuth', 'Your wallet is on a different network — switch networks and try again.'],
-    ['txInsufficientBalance', 'Your XLM balance is too low to cover this transaction.'],
+    ['txInsufficientBalance', 'You need a little more XLM to cover the network fee.'],
     ['paymentUnderfunded', 'Your balance is too low for this payment.'],
   ])('%s reads as a next step, and humanizeError keeps it whole', (code, message) => {
     const e = new TxRejectedError(code);
@@ -90,12 +90,18 @@ describe('TxRejectedError', () => {
     expect(humanizeError(e)).not.toMatch(/_maxDepth|_attributes/);
   });
 
-  it('humanizeError does not reword a rejection whose code says "insufficient"', () => {
-    // Its keyword rule would turn this into the USDC-balance message — wrong for a fee.
-    const e = new TxRejectedError('invokeHostFunctionInsufficientRefundableFee');
-    expect(humanizeError(e)).toBe(e.message);
-    expect(humanizeError(new Error(e.message))).not.toBe(e.message);
-  });
+  it.each([undefined, 'tip', 'reward'] as const)(
+    'humanizeError hands a rejection back whole (flow %s), however long its code',
+    (flow) => {
+      // Past 120 characters humanizeError's generic path would truncate the message.
+      const e = new TxRejectedError(`invokeHostFunction${'Resource'.repeat(8)}LimitExceeded`);
+      expect(e.message.length).toBeGreaterThan(120);
+      expect(humanizeError(e, {}, flow)).toBe(e.message);
+      expect(humanizeError(new TxRejectedError('txBadSeq'), {}, flow)).toBe(
+        'Another transaction went out at the same moment — try again.',
+      );
+    },
+  );
 
   it('humanizeError keeps the not-queued message whole too', () => {
     const e = new TxNotQueuedError('H', 4);

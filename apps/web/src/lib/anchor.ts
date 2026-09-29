@@ -288,7 +288,7 @@ export async function sendWithdrawalPayment(
   const account = await server.getAccount(wallet.address);
   const signedXdr = await wallet.sign(buildWithdrawalPayment(account, w, usdcIssuer));
   const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
-  const hash = await submitSigned(signed);
+  const hash = await submitSigned(signed, 'anchor payment');
   for (let i = 0; i < 30; i++) {
     const res = await server.getTransaction(hash);
     if (res.status === 'SUCCESS') return hash;

@@ -23,7 +23,7 @@ export async function sendXlm(wallet: Wallet, to: string, amount: string): Promi
 
   const signedXdr = await wallet.sign(tx.toXDR());
   const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
-  const hash = await submitSigned(signed);
+  const hash = await submitSigned(signed, 'payment');
 
   // Poll briefly so the UI can show a confirmed success/failure.
   for (let i = 0; i < 15; i++) {
