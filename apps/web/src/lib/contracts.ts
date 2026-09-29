@@ -19,7 +19,7 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 import { server, networkPassphrase, config } from './stellar';
-import { throwTxRejected } from './tx-errors';
+import { submitSigned } from './submit';
 import type { Wallet } from './wallet';
 
 const BASE_FEE = '1000000'; // 0.1 XLM ceiling; simulation sets the real fee.
@@ -150,14 +150,11 @@ async function submitAndWait(
   const signedXdr = await wallet.sign(prepared.toXDR());
   const signed = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
 
-  const sent = await server.sendTransaction(signed);
-  if (sent.status === 'ERROR') {
-    throwTxRejected(sent.errorResult);
-  }
+  const hash = await submitSigned(signed, `send ${method}`);
 
-  const result = await pollTransaction(sent.hash);
+  const result = await pollTransaction(hash);
   const retval = result.returnValue;
-  return { hash: sent.hash, value: retval ? scValToNative(retval) : undefined };
+  return { hash, value: retval ? scValToNative(retval) : undefined };
 }
 
 /** A `#[contracttype]` enum key as the contracts store it: `vec[Symbol(variant), ...fields]`. */
