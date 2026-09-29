@@ -14,6 +14,7 @@ vi.mock('./stellar', () => ({
 import {
   decodeScVal,
   fetchReputationEvents,
+  fetchTipEvents,
   fetchTipsSent,
   EVENT_LEDGER_WINDOW,
   MAX_PAGES,
@@ -24,7 +25,7 @@ import {
  * Helper: assert two Uint8Arrays have the same bytes.
  */
 function expectBytesEqual(actual: Uint8Array, expected: Uint8Array) {
-  expect(actual).toBeInstanceOf(Uint8Array);
+  expect(ArrayBuffer.isView(actual)).toBe(true);
   expect(actual.length).toBe(expected.length);
   for (let i = 0; i < actual.length; i++) {
     expect(actual[i]).toBe(expected[i]);
@@ -104,7 +105,7 @@ describe('decodeScVal', () => {
   describe('address values', () => {
     it('decodes an account address (G…) ScVal to a string', () => {
       // Construct an account address ScVal using a raw 32-byte key buffer
-      const keyBuf = new Uint8Array(32);
+      const keyBuf = Buffer.alloc(32);
       for (let i = 0; i < 32; i++) keyBuf[i] = i + 1;
       const pubKey = xdr.PublicKey.publicKeyTypeEd25519(keyBuf);
       const scAddr = xdr.ScAddress.scAddressTypeAccount(pubKey);
@@ -128,15 +129,15 @@ describe('decodeScVal', () => {
 
   describe('bytes', () => {
     it('decodes a Bytes ScVal to a Uint8Array with order preserved', () => {
-      const data = new Uint8Array([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe]);
+      const data = Buffer.from([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe]);
       const scv = xdr.ScVal.scvBytes(data);
       const result = decodeScVal(scv);
-      expect(result).toBeInstanceOf(Uint8Array);
+      expect(ArrayBuffer.isView(result)).toBe(true);
       expectBytesEqual(result as Uint8Array, data);
     });
 
     it('decodes a non-trivial byte sequence correctly', () => {
-      const data = new Uint8Array(64);
+      const data = Buffer.alloc(64);
       for (let i = 0; i < data.length; i++) data[i] = i;
       const scv = xdr.ScVal.scvBytes(data);
       const result = decodeScVal(scv) as Uint8Array;
@@ -158,7 +159,7 @@ describe('decodeScVal', () => {
 
     it('decodes a Vec containing different ScVal types recursively', () => {
       // Build a consistent address ScVal without Keypair (jsdom incompatible)
-      const keyBuf = new Uint8Array(32).fill(0xab);
+      const keyBuf = Buffer.alloc(32, 0xab);
       const pubKey = xdr.PublicKey.publicKeyTypeEd25519(keyBuf);
       const scAddr = xdr.ScAddress.scAddressTypeAccount(pubKey);
       const addrScv = xdr.ScVal.scvAddress(scAddr);
@@ -167,7 +168,7 @@ describe('decodeScVal', () => {
         xdr.ScVal.scvSymbol('user'),
         addrScv,
         xdr.ScVal.scvU32(7),
-        xdr.ScVal.scvBytes(new Uint8Array([0x01, 0x02])),
+        xdr.ScVal.scvBytes(Buffer.from([0x01, 0x02])),
       ]);
       const result = decodeScVal(scv) as unknown[];
       expect(Array.isArray(result)).toBe(true);
@@ -175,7 +176,7 @@ describe('decodeScVal', () => {
       expect(typeof result[1]).toBe('string');
       expect((result[1] as string)).toMatch(/^G[A-Z2-7]{55}$/);
       expect(result[2]).toBe(7);
-      expect(result[3]).toBeInstanceOf(Uint8Array);
+      expect(ArrayBuffer.isView(result[3])).toBe(true);
     });
   });
 
@@ -276,6 +277,18 @@ describe('contract event reads', () => {
     // ('tipped', from, to) has THREE topics; a 2-segment filter would never match it.
     expect(filter.topics).toEqual([[sym('tipped'), new Address(from).toScVal().toXDR('base64'), '*']]);
     expect(events).toEqual([{ topics: ['tipped', from, to], data: 5n, ledger: 19_999 }]);
+  });
+
+  it('reads every tip in the window with a three-segment tipped filter', async () => {
+    getLatestLedgerMock.mockResolvedValue({ sequence: 20_000 });
+    getEventsMock.mockResolvedValue({ events: [] });
+
+    await fetchTipEvents();
+
+    const filter = getEventsMock.mock.calls[0][0].filters[0];
+    expect(filter.contractIds).toEqual(['CRWD']);
+    // ('tipped', from, to) has THREE topics; a 2-segment wildcard would never match it.
+    expect(filter.topics).toEqual([[sym('tipped'), '*', '*']]);
   });
 
   it('returns no tips for a malformed sender without calling RPC', async () => {

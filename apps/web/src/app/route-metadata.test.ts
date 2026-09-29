@@ -53,8 +53,10 @@ async function resolveWith(root: Metadata, pathname: string, ...segments: Segmen
 const profile = (handle: string) => () => profileLayout.generateMetadata({ params: { handle } });
 const invite = (handle: string) => () => inviteLayout.generateMetadata({ params: { handle } });
 
-const imageUrls = (images: { url: string | URL }[] | undefined) =>
-  (images ?? []).map((i) => i.url.toString());
+// Next's OGImage union also allows a bare string/URL, not just a descriptor object;
+// mirror that here since the resolved metadata type keeps the full union.
+const imageUrls = (images: Array<string | URL | { url: string | URL }> | undefined) =>
+  (images ?? []).map((i) => (typeof i === 'string' || i instanceof URL ? i.toString() : i.url.toString()));
 
 /** Every piece of text a page or its unfurl shows. */
 function texts(m: ResolvedMetadata) {
@@ -137,11 +139,18 @@ describe('route metadata', () => {
     expect(m.twitter?.card).toBe('summary_large_image');
   });
 
-  it('/v/<handle> reads as an invite from that handle', async () => {
-    const m = await resolve('/v/Bob', null, invite('Bob'));
+  it('/v/<handle> reads as an invite from that handle and uses its opengraph-image for twitter:image', async () => {
+    const m = await resolve('/v/Bob', null, {
+      metadata: invite('Bob'),
+      ogImage: '/v/bob/opengraph-image?a1b2',
+    });
+    const card = at('/v/bob/opengraph-image?a1b2');
     expect(m.title?.absolute).toBe('@bob invited you · alvinmunk');
     expect(m.openGraph?.description).toContain('@bob');
     expect(m.alternates?.canonical?.url.toString()).toBe(at('/v/bob'));
+    expect(imageUrls(m.openGraph?.images)).toEqual([card]);
+    expect(imageUrls(m.twitter?.images)).toEqual([card]);
+    expect(m.twitter?.card).toBe('summary_large_image');
   });
 
   it.each(['not-a-handle', 'a'.repeat(33), '%3Cscript%3E'])(
