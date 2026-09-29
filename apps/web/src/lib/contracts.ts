@@ -19,6 +19,7 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 import { server, networkPassphrase, config } from './stellar';
+import { throwTxRejected } from './tx-errors';
 import type { Wallet } from './wallet';
 
 const BASE_FEE = '1000000'; // 0.1 XLM ceiling; simulation sets the real fee.
@@ -151,7 +152,7 @@ async function submitAndWait(
 
   const sent = await server.sendTransaction(signed);
   if (sent.status === 'ERROR') {
-    throw new Error(`send ${method} failed: ${JSON.stringify(sent.errorResult)}`);
+    throwTxRejected(sent.errorResult);
   }
 
   const result = await pollTransaction(sent.hash);

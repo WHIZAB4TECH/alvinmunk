@@ -5,6 +5,7 @@
  */
 import { Asset, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import { server, networkPassphrase } from './stellar';
+import { throwTxRejected } from './tx-errors';
 import type { Wallet } from './wallet';
 
 export interface PaymentResult {
@@ -25,7 +26,7 @@ export async function sendXlm(wallet: Wallet, to: string, amount: string): Promi
   const sent = await server.sendTransaction(signed);
 
   if (sent.status === 'ERROR') {
-    throw new Error(`payment rejected: ${JSON.stringify(sent.errorResult)}`);
+    throwTxRejected(sent.errorResult);
   }
 
   // Poll briefly so the UI can show a confirmed success/failure.

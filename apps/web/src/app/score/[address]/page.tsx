@@ -19,11 +19,17 @@ interface ScorePageProps {
 export async function generateMetadata({ params }: ScorePageProps): Promise<{
   title: string;
   description: string;
+  openGraph: { title: string; description: string };
 }> {
   const { address } = await params;
+  const description = `View the on-chain reputation for ${address} — people who vouched, Social XP, Earned XP, and quest attestations.`;
   return {
-    title: `Reputation: ${shortAddress(address)} · alvinmunk`,
-    description: `View the on-chain reputation for ${address} — people who vouched, Social XP, Earned XP, and quest attestations.`,
+    title: `Reputation: ${shortAddress(address)}`,
+    description,
+    openGraph: {
+      title: `Reputation: ${shortAddress(address)} · alvinmunk`,
+      description,
+    },
   };
 }
 

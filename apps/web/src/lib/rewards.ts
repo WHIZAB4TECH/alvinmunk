@@ -20,6 +20,7 @@ import {
   rewardsId,
 } from './contracts';
 import { server, horizon, networkPassphrase, config } from './stellar';
+import { throwTxRejected } from './tx-errors';
 import type { Wallet } from './wallet';
 
 const usdcSacId = () => config.contracts.usdcSac;
@@ -91,7 +92,7 @@ export async function enableUsdc(wallet: Wallet): Promise<string> {
   const signed = TransactionBuilder.fromXDR(await wallet.sign(tx.toXDR()), networkPassphrase);
   const sent = await server.sendTransaction(signed);
   if (sent.status === 'ERROR') {
-    throw new Error(`trustline rejected: ${JSON.stringify(sent.errorResult)}`);
+    throwTxRejected(sent.errorResult);
   }
   await waitConfirmed(sent.hash);
   return sent.hash;

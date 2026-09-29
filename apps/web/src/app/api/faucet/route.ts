@@ -19,6 +19,7 @@ import {
   nativeToScVal,
   rpc,
 } from '@stellar/stellar-sdk';
+import { throwTxRejected } from '@/lib/tx-errors';
 
 export const runtime = 'nodejs';
 
@@ -91,7 +92,7 @@ export async function POST(req: Request): Promise<Response> {
       const prepared = await srpc.prepareTransaction(built);
       prepared.sign(issuer); // source = issuer = SAC admin → satisfies mint's admin auth
       const sent = await srpc.sendTransaction(prepared);
-      if (sent.status === 'ERROR') throw new Error(JSON.stringify(sent.errorResult));
+      if (sent.status === 'ERROR') throwTxRejected(sent.errorResult);
       for (let i = 0; i < 30; i++) {
         const r = await srpc.getTransaction(sent.hash);
         if (r.status === 'SUCCESS') break;

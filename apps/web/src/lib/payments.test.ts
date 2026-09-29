@@ -36,6 +36,7 @@ vi.mock('@stellar/stellar-sdk', async (importOriginal) => {
 });
 
 import { sendXlm } from './payments';
+import { TxRejectedError } from './tx-errors';
 import type { Wallet } from './wallet';
 
 function makeWallet(): Wallet {
@@ -78,8 +79,17 @@ describe('sendXlm status mapping', () => {
   });
 
   it('throws when sendTransaction itself errors', async () => {
-    sendTransactionMock.mockResolvedValue({ status: 'ERROR', errorResult: { foo: 'bar' } });
-    await expect(sendXlm(makeWallet(), 'GB72PZXNOU6DJ2BXZDITS24A5JCN3CEUNTKIX5ESZDXAY2R5HO7YZ3H3', '10')).rejects.toThrow('payment rejected');
+    sendTransactionMock.mockResolvedValue({
+      status: 'ERROR',
+      errorResult: { result: () => ({ switch: () => ({ name: 'txBadSeq' }) }) },
+    });
+    await expect(
+      sendXlm(makeWallet(), 'GB72PZXNOU6DJ2BXZDITS24A5JCN3CEUNTKIX5ESZDXAY2R5HO7YZ3H3', '10'),
+    ).rejects.toMatchObject({
+      name: 'TxRejectedError',
+      code: 'txBadSeq',
+      message: 'Another transaction went out at the same moment — try again',
+    } satisfies Partial<TxRejectedError>);
   });
 
   it('falls back to PENDING when confirmation never resolves within the poll budget', async () => {
