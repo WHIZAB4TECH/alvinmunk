@@ -14,6 +14,7 @@ import {
   OrbitRing,
   useGlow,
   fibonacciSphere,
+  useFrameloop,
   usePrefersReducedMotion,
 } from './constellation-parts';
 
@@ -120,14 +121,19 @@ function Scene({ reduced }: { reduced: boolean }) {
 
 export default function ConstellationBackdrop() {
   const reduced = usePrefersReducedMotion();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const frameloop = useFrameloop(wrapRef, reduced);
   return (
-    <Canvas
-      camera={{ position: [0, 0, 8.4], fov: 52 }}
-      dpr={[1, 2]}
-      gl={{ alpha: true, antialias: true }}
-      style={{ background: 'transparent' }}
-    >
-      <Scene reduced={reduced} />
-    </Canvas>
+    <div ref={wrapRef} style={{ width: '100%', height: '100%' }}>
+      <Canvas
+        camera={{ position: [0, 0, 8.4], fov: 52 }}
+        dpr={[1, 1.5]}
+        gl={{ alpha: true, antialias: true }}
+        style={{ background: 'transparent' }}
+        frameloop={frameloop}
+      >
+        <Scene reduced={reduced} />
+      </Canvas>
+    </div>
   );
 }
